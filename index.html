@@ -78,13 +78,15 @@
                 </div>
                 <span class="preset-icon" aria-hidden="true">▤</span>
               </div>
-              <p class="section-hint">자주 쓰는 후보 목록을 저장해둘 수 있어요. 이 기능은 다음 단계에서 구현됩니다.</p>
+              <p class="section-hint">자주 쓰는 후보 목록을 이름을 붙여 저장해 보세요.</p>
+              <p id="preset-notice" class="storage-notice" role="status" aria-live="polite"></p>
+              <p id="storage-notice" class="storage-notice" role="status" aria-live="polite"></p>
               <div class="preset-save-row">
                 <div class="field">
                   <label for="preset-name">프리셋 이름</label>
-                  <input id="preset-name" type="text" placeholder="예: 점심 메뉴" disabled>
+                  <input id="preset-name" type="text" placeholder="예: 점심 메뉴" maxlength="60" aria-describedby="preset-notice">
                 </div>
-                <button class="button button-primary save-button" type="button" disabled>저장</button>
+                <button id="save-preset" class="button button-primary save-button" type="button" disabled>저장</button>
               </div>
               <div class="preset-load-row">
                 <div class="field">
@@ -94,8 +96,8 @@
                   </select>
                 </div>
                 <div class="preset-actions">
-                  <button class="button button-secondary" type="button" disabled>불러오기</button>
-                  <button class="icon-button delete-button" type="button" aria-label="선택한 프리셋 삭제" disabled>×</button>
+                  <button id="load-preset" class="button button-secondary" type="button" disabled>불러오기</button>
+                  <button id="delete-preset" class="icon-button delete-button" type="button" aria-label="선택한 프리셋 삭제" disabled>×</button>
                 </div>
               </div>
             </section>

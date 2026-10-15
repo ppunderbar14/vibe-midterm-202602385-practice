@@ -138,3 +138,6 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+.storage-notice { color: #60718b; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.storage-notice:empty { display: none; }

@@ -1,5 +1,7 @@
 "use strict";
 
+const STORAGE_KEY = "vibeRoulette:v1";
+const STORAGE_VERSION = 1;
 const MAX_CANDIDATES = 20;
 const TAU = Math.PI * 2;
 const POINTER_ANGLE = -Math.PI / 2;
@@ -15,6 +17,7 @@ const starterCandidates = [
 
 let candidates = starterCandidates.map((candidate) => ({ ...candidate }));
 let nextCandidateId = 1;
+let presets = [];
 let isSpinning = false;
 let rotationAngle = 0;
 let animationFrameId = 0;
@@ -25,6 +28,103 @@ const candidateCount = document.querySelector("#candidate-count");
 const candidateNotice = document.querySelector("#candidate-notice");
 const addCandidateButton = document.querySelector("#add-candidate");
 const spinButton = document.querySelector(".spin-button");
+
+const presetNameInput = document.querySelector("#preset-name");
+const presetSelect = document.querySelector("#preset-select");
+const savePresetButton = document.querySelector("#save-preset");
+const loadPresetButton = document.querySelector("#load-preset");
+const deletePresetButton = document.querySelector("#delete-preset");
+const presetNotice = document.querySelector("#preset-notice");
+const storageNotice = document.querySelector("#storage-notice");
+
+function copyCandidates(list) {
+  return list.map(({ id, name, weight, color }) => ({ id, name, weight, color }));
+}
+
+function validateStoredCandidates(list) {
+  if (!Array.isArray(list) || list.length > MAX_CANDIDATES) throw new Error("Invalid candidate list");
+  const ids = new Set();
+  return list.map((item) => {
+    if (!item || typeof item !== "object" || typeof item.id !== "string"
+        || !/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(item.id) || ids.has(item.id)
+        || typeof item.name !== "string" || !validateName(item.name).valid
+        || typeof item.weight !== "number" || !validateWeight(String(item.weight)).valid
+        || typeof item.color !== "string" || !validateColor(item.color).valid) {
+      throw new Error("Invalid candidate data");
+    }
+    ids.add(item.id);
+    return { id: item.id, name: item.name.trim(), weight: item.weight, color: item.color.toUpperCase() };
+  });
+}
+
+function restoreState() {
+  let raw;
+  try {
+    raw = window.localStorage.getItem(STORAGE_KEY);
+  } catch {
+    storageNotice.textContent = "브라우저 저장소에 접근할 수 없어요. 현재 화면에서는 사용할 수 있지만 새로고침하면 유지되지 않을 수 있어요.";
+    return;
+  }
+  if (raw === null) return;
+  try {
+    const data = JSON.parse(raw);
+    if (!data || data.version !== STORAGE_VERSION || !Array.isArray(data.presets)) {
+      throw new Error("Unsupported storage data");
+    }
+    const restoredCandidates = validateStoredCandidates(data.candidates);
+    const names = new Set();
+    const restoredPresets = data.presets.map((preset) => {
+      if (!preset || typeof preset.name !== "string" || !validateName(preset.name).valid
+          || names.has(preset.name.trim())) throw new Error("Invalid preset data");
+      const name = preset.name.trim();
+      names.add(name);
+      return { name, candidates: validateStoredCandidates(preset.candidates) };
+    });
+    candidates = restoredCandidates;
+    presets = restoredPresets;
+    storageNotice.textContent = "저장된 후보와 프리셋을 불러왔어요.";
+  } catch {
+    storageNotice.textContent = "저장 데이터가 올바르지 않거나 지원하지 않는 형식이에요. 기본 후보로 시작하며 원본은 변경하지 않았어요. 이후 후보나 프리셋을 변경하면 새 상태를 저장해요.";
+  }
+}
+
+function persistState() {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      version: STORAGE_VERSION, candidates: copyCandidates(candidates),
+      presets: presets.map((preset) => ({ name: preset.name, candidates: copyCandidates(preset.candidates) })),
+    }));
+    storageNotice.textContent = "현재 후보와 프리셋을 이 브라우저에 저장했어요.";
+    return true;
+  } catch {
+    storageNotice.textContent = "브라우저에 저장하지 못했어요. 현재 화면에서는 계속 사용할 수 있지만 새로고침하면 변경 사항이 유지되지 않을 수 있어요.";
+    return false;
+  }
+}
+
+function updatePresetControls() {
+  presetNameInput.disabled = isSpinning;
+  savePresetButton.disabled = isSpinning;
+  presetSelect.disabled = isSpinning || presets.length === 0;
+  const selected = presets.some((preset) => preset.name === presetSelect.value);
+  loadPresetButton.disabled = isSpinning || !selected;
+  deletePresetButton.disabled = isSpinning || !selected;
+}
+
+function renderPresets(selectedName = presetSelect.value) {
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = presets.length ? "프리셋을 선택해 주세요" : "저장된 프리셋이 없어요";
+  presetSelect.replaceChildren(placeholder, ...presets.map((preset) => {
+    const option = document.createElement("option");
+    option.value = preset.name;
+    option.textContent = preset.name;
+    return option;
+  }));
+  presetSelect.value = selectedName;
+  if (presetSelect.selectedIndex < 0) presetSelect.value = "";
+  updatePresetControls();
+}
 
 function validateName(value) {
   const name = value.trim();
@@ -181,6 +281,7 @@ function updateCandidateFromInput(input) {
 
   updateProbabilities();
   drawWheel();
+  persistState();
 }
 
 function renderCandidates() {
@@ -339,6 +440,7 @@ function setInteractionLock(locked) {
   addCandidateButton.disabled = locked || candidates.length >= MAX_CANDIDATES;
   addCandidateButton.setAttribute("aria-disabled", String(addCandidateButton.disabled));
   spinButton.disabled = locked || candidates.length < 2;
+  updatePresetControls();
 }
 
 function spinWheel() {
@@ -432,7 +534,7 @@ candidateList.addEventListener("change", (event) => {
   if (!(event.target instanceof HTMLInputElement)) return;
   const input = event.target;
   updateCandidateFromInput(input);
-  if (input.dataset.field === "name" && !input.getAttribute("aria-invalid")) {
+  if (input.dataset.field === "name" && input.getAttribute("aria-invalid") !== "true") {
     const candidate = candidates.find((item) => item.id === input.closest(".candidate-row").dataset.candidateId);
     if (candidate) input.value = candidate.name;
   }
@@ -446,6 +548,7 @@ candidateList.addEventListener("click", (event) => {
   candidates = candidates.filter((candidate) => candidate.id !== row.dataset.candidateId);
   candidateNotice.textContent = "후보를 삭제했어요.";
   renderCandidates();
+  persistState();
 });
 
 addCandidateButton.addEventListener("click", () => {
@@ -454,6 +557,7 @@ addCandidateButton.addEventListener("click", () => {
     candidateNotice.textContent = `후보는 최대 ${MAX_CANDIDATES}개까지 추가할 수 있어요.`;
     return;
   }
+  while (candidates.some((item) => item.id === `candidate-${nextCandidateId}`)) nextCandidateId += 1;
   const candidate = {
     id: `candidate-${nextCandidateId++}`,
     name: "새 후보",
@@ -464,10 +568,63 @@ addCandidateButton.addEventListener("click", () => {
   candidateNotice.textContent = "후보를 추가했어요.";
   renderCandidates();
   document.getElementById(`${candidate.id}-name`).focus();
+  persistState();
+});
+
+presetSelect.addEventListener("change", updatePresetControls);
+presetNameInput.addEventListener("input", () => {
+  presetNameInput.removeAttribute("aria-invalid");
+  presetNotice.textContent = "";
+});
+savePresetButton.addEventListener("click", () => {
+  if (isSpinning) return;
+  const validation = validateName(presetNameInput.value);
+  if (!validation.valid) {
+    presetNameInput.setAttribute("aria-invalid", "true");
+    presetNotice.textContent = "프리셋 이름은 앞뒤 공백 제거 후 1~30자로 입력해 주세요.";
+    return;
+  }
+  const name = validation.value;
+  const existing = presets.find((preset) => preset.name === name);
+  if (existing && !window.confirm(`“${name}” 프리셋을 덮어쓸까요?`)) {
+    presetNotice.textContent = "덮어쓰기를 취소했어요.";
+    return;
+  }
+  const saved = { name, candidates: copyCandidates(candidates) };
+  if (existing) presets[presets.indexOf(existing)] = saved;
+  else presets.push(saved);
+  presetNameInput.value = name;
+  presetNameInput.removeAttribute("aria-invalid");
+  presetNotice.textContent = "프리셋을 저장했어요.";
+  renderPresets(name);
+  persistState();
+});
+loadPresetButton.addEventListener("click", () => {
+  if (isSpinning) return;
+  const preset = presets.find((item) => item.name === presetSelect.value);
+  if (!preset) return;
+  candidates = copyCandidates(preset.candidates);
+  rotationAngle = 0;
+  resultText.textContent = "룰렛을 돌려 오늘의 선택을 확인해 보세요.";
+  candidateNotice.textContent = "프리셋의 후보 목록을 불러왔어요.";
+  renderCandidates();
+  persistState();
+  presetNotice.textContent = "프리셋을 불러왔어요.";
+});
+deletePresetButton.addEventListener("click", () => {
+  if (isSpinning) return;
+  const index = presets.findIndex((preset) => preset.name === presetSelect.value);
+  if (index < 0) return;
+  presets.splice(index, 1);
+  renderPresets();
+  persistState();
+  presetNotice.textContent = "프리셋을 삭제했어요.";
 });
 
 if (canvas) {
+  restoreState();
   renderCandidates();
+  renderPresets();
   if ("ResizeObserver" in window) {
     new ResizeObserver(drawWheel).observe(canvas);
   } else {
