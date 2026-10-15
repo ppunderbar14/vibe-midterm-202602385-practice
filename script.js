@@ -3,6 +3,9 @@
 const MAX_CANDIDATES = 20;
 const TAU = Math.PI * 2;
 const POINTER_ANGLE = -Math.PI / 2;
+const SPIN_DURATION = 4200;
+const MIN_SPIN_TURNS = 5;
+const TARGET_EDGE_MARGIN = 1e-9;
 const starterCandidates = [
   { id: "korean", name: "한식", weight: 1, color: "#5B8DEF" },
   { id: "chinese", name: "중식", weight: 1, color: "#8B75DE" },
@@ -12,6 +15,9 @@ const starterCandidates = [
 
 let candidates = starterCandidates.map((candidate) => ({ ...candidate }));
 let nextCandidateId = 1;
+let isSpinning = false;
+let rotationAngle = 0;
+let animationFrameId = 0;
 
 const canvas = document.querySelector("#wheel");
 const candidateList = document.querySelector("#candidate-list");
@@ -138,6 +144,7 @@ function setFieldError(input, message) {
 }
 
 function updateCandidateFromInput(input) {
+  if (isSpinning) return;
   const row = input.closest(".candidate-row");
   const candidate = candidates.find((item) => item.id === row.dataset.candidateId);
   if (!candidate) return;
@@ -181,7 +188,11 @@ function renderCandidates() {
   candidateCount.textContent = `${candidates.length} / ${MAX_CANDIDATES}개`;
   addCandidateButton.disabled = candidates.length >= MAX_CANDIDATES;
   addCandidateButton.setAttribute("aria-disabled", String(addCandidateButton.disabled));
-  spinButton.disabled = true;
+  spinButton.disabled = isSpinning || candidates.length < 2;
+  candidateList.querySelectorAll("input, button").forEach((control) => {
+    control.disabled = isSpinning;
+  });
+  addCandidateButton.disabled = isSpinning || candidates.length >= MAX_CANDIDATES;
   updateProbabilities();
   drawWheel();
 }
@@ -217,7 +228,7 @@ function drawWheel() {
   }
 
   const totalWeight = getTotalWeight();
-  let startAngle = POINTER_ANGLE;
+  let startAngle = rotationAngle;
   candidates.forEach((candidate) => {
     const sliceAngle = TAU * candidate.weight / totalWeight;
     const endAngle = startAngle + sliceAngle;
@@ -270,12 +281,154 @@ function drawCandidateLabel(context, name, startAngle, endAngle, center, radius)
   context.restore();
 }
 
+function normalizeAngle(angle) {
+  return ((angle % TAU) + TAU) % TAU;
+}
+
+function getWheelSegments(snapshot) {
+  const totalWeight = snapshot.reduce((total, candidate) => total + candidate.weight, 0);
+  let startAngle = 0;
+  return snapshot.map((candidate, index) => {
+    const endAngle = index === snapshot.length - 1
+      ? TAU
+      : startAngle + TAU * candidate.weight / totalWeight;
+    const segment = { candidate, startAngle, endAngle };
+    startAngle = endAngle;
+    return segment;
+  });
+}
+
+function candidateAtPointer(snapshot, angle) {
+  const localAngle = normalizeAngle(POINTER_ANGLE - angle);
+  const segments = getWheelSegments(snapshot);
+  return segments.find((segment) => localAngle >= segment.startAngle && localAngle < segment.endAngle)?.candidate
+    ?? segments[segments.length - 1]?.candidate
+    ?? null;
+}
+
+function chooseTarget(snapshot) {
+  const segments = getWheelSegments(snapshot);
+  const totalWeight = snapshot.reduce((total, candidate) => total + candidate.weight, 0);
+  const targetWeight = Math.random() * totalWeight;
+  let cumulativeWeight = 0;
+
+  for (const segment of segments) {
+    cumulativeWeight += segment.candidate.weight;
+    if (targetWeight < cumulativeWeight) {
+      const fraction = (targetWeight - (cumulativeWeight - segment.candidate.weight)) / segment.candidate.weight;
+      const sliceAngle = segment.endAngle - segment.startAngle;
+      const edgeMargin = Math.min(TARGET_EDGE_MARGIN, sliceAngle / 4);
+      const rawTargetAngle = segment.startAngle + sliceAngle * fraction;
+      const targetAngle = Math.min(
+        segment.endAngle - edgeMargin,
+        Math.max(segment.startAngle + edgeMargin, rawTargetAngle),
+      );
+      return { targetAngle, candidate: segment.candidate };
+    }
+  }
+
+  const last = segments[segments.length - 1];
+  return { targetAngle: last.endAngle - Math.min(TARGET_EDGE_MARGIN, (last.endAngle - last.startAngle) / 4), candidate: last.candidate };
+}
+
+function setInteractionLock(locked) {
+  isSpinning = locked;
+  candidateList.querySelectorAll("input, button").forEach((control) => {
+    control.disabled = locked;
+  });
+  addCandidateButton.disabled = locked || candidates.length >= MAX_CANDIDATES;
+  addCandidateButton.setAttribute("aria-disabled", String(addCandidateButton.disabled));
+  spinButton.disabled = locked || candidates.length < 2;
+}
+
+function spinWheel() {
+  if (isSpinning || candidates.length < 2) return;
+
+  const snapshot = candidates.map((candidate) => ({ ...candidate }));
+  if (snapshot.some((candidate) => !validateName(candidate.name).valid
+      || !validateWeight(String(candidate.weight)).valid
+      || !validateColor(candidate.color).valid)) {
+    candidateNotice.textContent = "후보 정보를 확인한 뒤 다시 돌려 주세요.";
+    return;
+  }
+
+  const { targetAngle } = chooseTarget(snapshot);
+  const currentPointerAngle = normalizeAngle(POINTER_ANGLE - rotationAngle);
+  const targetOffset = normalizeAngle(currentPointerAngle - targetAngle);
+  const startRotation = rotationAngle;
+  const finalRotation = startRotation + MIN_SPIN_TURNS * TAU + targetOffset;
+  const startedAt = performance.now();
+  let settled = false;
+
+  setInteractionLock(true);
+  candidateNotice.textContent = "룰렛이 돌아가는 동안 후보를 수정할 수 없어요.";
+  resultText.textContent = "룰렛이 돌아가고 있어요…";
+
+  function finishSpin() {
+    rotationAngle = finalRotation;
+    drawWheel();
+    const winner = candidateAtPointer(snapshot, rotationAngle);
+    if (!winner) throw new Error("회전 종료 각도에서 후보를 찾지 못했습니다.");
+    resultText.textContent = `오늘의 선택은 ${winner.name}입니다!`;
+    candidateNotice.textContent = `${winner.name}이(가) 선택됐어요.`;
+    settled = true;
+    setInteractionLock(false);
+    renderCandidates();
+  }
+
+  function recoverSpin(error) {
+    rotationAngle = startRotation;
+    setInteractionLock(false);
+    resultText.textContent = "룰렛 회전을 완료하지 못했어요. 다시 시도해 주세요.";
+    candidateNotice.textContent = "회전 중 오류가 발생해 조작을 복구했어요.";
+    try {
+      drawWheel();
+    } catch (renderError) {
+      console.error("원판 복구 오류:", renderError);
+    }
+    console.error("룰렛 회전 오류:", error);
+  }
+
+  function animate(now) {
+    try {
+      const progress = Math.min(1, Math.max(0, (now - startedAt) / SPIN_DURATION));
+      const easedProgress = 1 - (1 - progress) ** 4;
+      rotationAngle = startRotation + (finalRotation - startRotation) * easedProgress;
+      drawWheel();
+
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(animate);
+        return;
+      }
+
+      finishSpin();
+    } catch (error) {
+      recoverSpin(error);
+    } finally {
+      if (settled || !isSpinning) animationFrameId = 0;
+    }
+  }
+
+  try {
+    animationFrameId = requestAnimationFrame(animate);
+  } catch (error) {
+    recoverSpin(error);
+    animationFrameId = 0;
+  }
+}
+
+const resultText = document.querySelector(".result > span:last-child");
+
+spinButton.addEventListener("click", spinWheel);
+
 candidateList.addEventListener("input", (event) => {
+  if (isSpinning) return;
   if (!(event.target instanceof HTMLInputElement)) return;
   if (event.target.dataset.field !== "color") updateCandidateFromInput(event.target);
 });
 
 candidateList.addEventListener("change", (event) => {
+  if (isSpinning) return;
   if (!(event.target instanceof HTMLInputElement)) return;
   const input = event.target;
   updateCandidateFromInput(input);
@@ -286,6 +439,7 @@ candidateList.addEventListener("change", (event) => {
 });
 
 candidateList.addEventListener("click", (event) => {
+  if (isSpinning) return;
   const button = event.target.closest("button[data-action=\"delete\"]");
   if (!button) return;
   const row = button.closest(".candidate-row");
@@ -295,6 +449,7 @@ candidateList.addEventListener("click", (event) => {
 });
 
 addCandidateButton.addEventListener("click", () => {
+  if (isSpinning) return;
   if (candidates.length >= MAX_CANDIDATES) {
     candidateNotice.textContent = `후보는 최대 ${MAX_CANDIDATES}개까지 추가할 수 있어요.`;
     return;
