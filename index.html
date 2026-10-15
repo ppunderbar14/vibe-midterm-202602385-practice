@@ -33,13 +33,13 @@
                 <p class="eyebrow">LET'S SPIN</p>
                 <h2 id="wheel-title">오늘의 룰렛</h2>
               </div>
-              <span class="status-pill"><span aria-hidden="true"></span> 준비 중</span>
+              <span class="status-pill"><span aria-hidden="true"></span> 원판 미리보기</span>
             </div>
 
             <div class="wheel-stage">
               <span class="pointer" aria-hidden="true"></span>
-              <canvas id="wheel" width="640" height="640" role="img" aria-label="룰렛 원판은 다음 단계에서 구현할 예정입니다.">
-                룰렛 원판은 다음 단계에서 구현할 예정입니다.
+              <canvas id="wheel" width="640" height="640" role="img" aria-label="가중치에 따라 나뉜 후보 원판입니다.">
+                후보 목록의 가중치와 색상을 반영한 원판입니다.
               </canvas>
             </div>
 
@@ -48,7 +48,7 @@
             </button>
             <p class="result" role="status" aria-live="polite">
               <span class="result-icon" aria-hidden="true">✦</span>
-              <span>화면 구성을 준비하고 있어요.</span>
+              <span>후보를 편집하면 원판과 확률이 바로 바뀌어요. 회전은 다음 단계에서 구현됩니다.</span>
             </p>
           </section>
 
@@ -59,86 +59,13 @@
                   <p class="eyebrow">YOUR OPTIONS</p>
                   <h2 id="candidates-title">후보 목록</h2>
                 </div>
-                <span class="count-pill">4개</span>
+                <span class="count-pill" id="candidate-count">4 / 20개</span>
               </div>
-              <p class="section-hint">이름과 가중치, 색상을 정해 선택지를 구성해요.</p>
+              <p class="section-hint">가중치 비율이 원판 조각과 선택 확률에 반영돼요.</p>
+              <p class="candidate-notice" id="candidate-notice" role="status" aria-live="polite"></p>
+              <div class="candidate-list" id="candidate-list" aria-label="후보 항목"></div>
 
-              <div class="candidate-list">
-                <article class="candidate-row">
-                  <span class="candidate-number" aria-hidden="true">01</span>
-                  <div class="candidate-fields">
-                    <div class="field field-name">
-                      <label for="candidate-1-name">후보 이름</label>
-                      <input id="candidate-1-name" type="text" value="한식" disabled>
-                    </div>
-                    <div class="field field-weight">
-                      <label for="candidate-1-weight">가중치</label>
-                      <input id="candidate-1-weight" type="number" value="1" min="1" max="100" disabled>
-                    </div>
-                    <div class="field field-color">
-                      <label for="candidate-1-color">색상</label>
-                      <input id="candidate-1-color" type="color" value="#5B8DEF" disabled>
-                    </div>
-                  </div>
-                  <button class="icon-button delete-button" type="button" aria-label="한식 삭제" disabled>×</button>
-                </article>
-                <article class="candidate-row">
-                  <span class="candidate-number" aria-hidden="true">02</span>
-                  <div class="candidate-fields">
-                    <div class="field field-name">
-                      <label for="candidate-2-name">후보 이름</label>
-                      <input id="candidate-2-name" type="text" value="중식" disabled>
-                    </div>
-                    <div class="field field-weight">
-                      <label for="candidate-2-weight">가중치</label>
-                      <input id="candidate-2-weight" type="number" value="1" min="1" max="100" disabled>
-                    </div>
-                    <div class="field field-color">
-                      <label for="candidate-2-color">색상</label>
-                      <input id="candidate-2-color" type="color" value="#8B75DE" disabled>
-                    </div>
-                  </div>
-                  <button class="icon-button delete-button" type="button" aria-label="중식 삭제" disabled>×</button>
-                </article>
-                <article class="candidate-row">
-                  <span class="candidate-number" aria-hidden="true">03</span>
-                  <div class="candidate-fields">
-                    <div class="field field-name">
-                      <label for="candidate-3-name">후보 이름</label>
-                      <input id="candidate-3-name" type="text" value="일식" disabled>
-                    </div>
-                    <div class="field field-weight">
-                      <label for="candidate-3-weight">가중치</label>
-                      <input id="candidate-3-weight" type="number" value="1" min="1" max="100" disabled>
-                    </div>
-                    <div class="field field-color">
-                      <label for="candidate-3-color">색상</label>
-                      <input id="candidate-3-color" type="color" value="#E9A94F" disabled>
-                    </div>
-                  </div>
-                  <button class="icon-button delete-button" type="button" aria-label="일식 삭제" disabled>×</button>
-                </article>
-                <article class="candidate-row">
-                  <span class="candidate-number" aria-hidden="true">04</span>
-                  <div class="candidate-fields">
-                    <div class="field field-name">
-                      <label for="candidate-4-name">후보 이름</label>
-                      <input id="candidate-4-name" type="text" value="양식" disabled>
-                    </div>
-                    <div class="field field-weight">
-                      <label for="candidate-4-weight">가중치</label>
-                      <input id="candidate-4-weight" type="number" value="1" min="1" max="100" disabled>
-                    </div>
-                    <div class="field field-color">
-                      <label for="candidate-4-color">색상</label>
-                      <input id="candidate-4-color" type="color" value="#E77F78" disabled>
-                    </div>
-                  </div>
-                  <button class="icon-button delete-button" type="button" aria-label="양식 삭제" disabled>×</button>
-                </article>
-              </div>
-
-              <button class="button button-secondary add-button" type="button" disabled>
+              <button class="button button-secondary add-button" id="add-candidate" type="button">
                 <span aria-hidden="true">＋</span> 후보 추가
               </button>
             </section>
@@ -151,7 +78,7 @@
                 </div>
                 <span class="preset-icon" aria-hidden="true">▤</span>
               </div>
-              <p class="section-hint">자주 쓰는 후보 목록을 저장해둘 수 있어요.</p>
+              <p class="section-hint">자주 쓰는 후보 목록을 저장해둘 수 있어요. 이 기능은 다음 단계에서 구현됩니다.</p>
               <div class="preset-save-row">
                 <div class="field">
                   <label for="preset-name">프리셋 이름</label>

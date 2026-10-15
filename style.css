@@ -66,9 +66,9 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; }
 .count-pill { min-width: 39px; justify-content: center; color: var(--blue); background: #edf4ff; }
 .section-hint { margin: 8px 0 14px; color: var(--muted); font-size: 12px; line-height: 1.55; }
 .candidate-list { display: grid; gap: 8px; }
-.candidate-row { display: grid; grid-template-columns: 25px minmax(0, 1fr) 36px; align-items: end; gap: 8px; padding: 9px; border: 1px solid #edf0f5; border-radius: 13px; background: #fff; }
+.candidate-row { display: grid; grid-template-columns: 25px minmax(0, 1fr) 36px; align-items: start; gap: 8px; padding: 9px; border: 1px solid #edf0f5; border-radius: 13px; background: #fff; }
 .candidate-number { align-self: center; color: #9aa5b5; font-size: 10px; font-weight: 750; font-variant-numeric: tabular-nums; }
-.candidate-fields { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 65px 52px; align-items: end; gap: 8px; }
+.candidate-fields { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) 65px 52px; align-items: start; gap: 8px; }
 .field { min-width: 0; display: grid; gap: 5px; }
 .field label { color: #7c8799; font-size: 10px; font-weight: 650; }
 .field input, .field select { width: 100%; min-width: 0; height: 44px; padding: 0 10px; border: 1px solid #e5e9f0; border-radius: 9px; outline: none; background: #fff; color: #344158; font-size: 12px; }
@@ -76,6 +76,14 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; }
 .field .field-color, .field input[type="color"] { padding: 5px; }
 .field input[type="color"]:disabled { padding: 5px; opacity: .72; }
 .field input:focus-visible, .field select:focus-visible { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(57, 120, 232, .14); }
+.field-error { display: none; color: #b83a4b; font-size: 10px; line-height: 1.35; }
+.field-error:not(:empty) { display: block; }
+.field input[aria-invalid="true"] { border-color: #cf5362; box-shadow: 0 0 0 2px rgba(207, 83, 98, .1); }
+.candidate-row .delete-button { grid-column: 3; grid-row: 1; align-self: center; }
+.candidate-probability { grid-column: 2; margin: 0; padding-top: 2px; color: #75839a; font-size: 10px; font-variant-numeric: tabular-nums; }
+.candidate-notice { min-height: 0; margin: 0; color: #60718b; font-size: 11px; }
+.candidate-notice:empty { display: none; }
+.candidate-notice:not(:empty) { margin: 0 0 8px; }
 .icon-button { display: inline-grid; width: 40px; height: 44px; place-items: center; border: 1px solid #e8ecf2; border-radius: 10px; background: #fff; color: #8b96a7; font-size: 22px; line-height: 1; }
 .icon-button:disabled { background: #fafbfd; color: #a6afbc; }
 .add-button { width: 100%; margin-top: 11px; }
